@@ -1,0 +1,101 @@
+
+# Setup
+```{r}
+blood_pressures <- read_csv("pop2.csv")
+
+blood_pressures <- blood_pressures %>%
+  mutate(sex=as.factor(sex), group=as.factor(group))
+
+sample_size <- 150
+
+```
+
+# 7.1
+
+``` {r 7.1}
+mean(blood_pressures$bmi) #1
+
+sd(blood_pressures$bmi) #2
+
+sample1 <- sample(blood_pressures$bmi, sample_size)
+
+list_of_sample_means <- rep(0, 10^5)
+
+for (i in 1:10^5) {
+  sample_i <- sample(blood_pressures$bmi, sample_size)
+  list_of_sample_means[i] <- mean(sample_i)
+}
+
+approximated_expectation <- mean(list_of_sample_means)
+approximated_expectation #3
+
+approximated_sd <-sd(list_of_sample_means)
+approximated_sd #4
+
+quantile(list_of_sample_means, c(0.1, 0.9)) #5
+
+qnorm(c(0.1, 0.9), approximated_expectation, approximated_sd)
+
+```
+## Notes on 7.1
+
+*1 & 2)* These deal in terms of the population, this means that expectation is the same as mean!
+These are the ideal values and are usually unobtainable.
+
+*3)* In this problem we are asked to find the "expectation of the sampling distribution for the sample average of the variable". What this means is that we are asked to find the average (or mean) a bunch of means that were taken from 
+random samples of the population. To accomplish this we collect 100,000 samples. Then we take the average of each of these 100,000 samples. Lastly we take the expectation of that, which is the mean.
+
+*4)* In this problem we are asked to find "the standard deviation of the sampling distribution for the sample average of the variable". What this means is that we are asked to find the S.D. of the list of averages from each sample. Thisis really saying "How much does our approximated expectation vary?" We want a lower value for this since this shows that we are more confident of the value.
+
+*5)* In this problem we are asked to find "the central region that contains 80% of the
+sampling distribution of the sample average". This means that we want to find where the central region starts and ends in the distribution of the sample means, so we are finding the quantiles in the list of sample means. Since the area is 80%, we can start at 10% of sampling distribution and end at 90% of the distribution, (90%-10% = 80%). 
+
+*6)* In this problem we are asked to do the same as problem 5, but this time using the central limit theorem. The CLT states
+
+# 9.1
+
+```{r 9.1}
+magnets <- read_csv("magnets.csv") %>%
+  mutate(active=as.factor(active))
+
+magnets %>% summary()
+
+magnets %>%
+  group_by(active) %>%
+  summarize(mean=mean(change), sd=sd(change))
+
+magnets %>%
+  ggplot(aes(x=change, color=active)) +
+  geom_boxplot()
+
+```
+## Problems and Answers
+
+*1)* The sample average of change is 3.5.
+*2)* It is a factor.
+*3)* Active Magnet - 5.24, Inactive Magnet - 1.09
+*4)* Active Magnet - 3.23, Inactive Magnet - 1.57
+*5)* There are no outliars in the inactive change, but there are 3 in the active change.
+
+# 10.1
+
+```{r 10.1}
+list_of_sample_means <- rep(0, 10^5)
+list_of_sample_medians <- rep(0, 10^5)
+
+for (i in 1:10^5) {
+  sample_i <- rnorm(100, 3, 2)
+  list_of_sample_means[i] <- mean(sample_i)
+  list_of_sample_medians[i] <- median(sample_i)
+}
+
+expectation_of_mean <- mean(list_of_sample_means)
+variance_of_mean <- var(list_of_sample_means)
+
+expectation_of_median <- mean(list_of_sample_medians)
+variance_of_median <- var(list_of_sample_medians)
+
+```
+
+*1)* 
+
