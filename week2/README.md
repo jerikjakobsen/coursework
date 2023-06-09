@@ -86,7 +86,6 @@ This week covers:
   * Read Sections 3.1 and 3.2 of ISRS
   * Do exercise 9.2 in IST
 
-<!--
 
 
 ## References
