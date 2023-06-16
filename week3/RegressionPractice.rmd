@@ -1,0 +1,81 @@
+---
+title: "RegressionPractice.rmd"
+output: html_document
+date: "2023-06-13"
+---
+# Setup
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(scales)
+library(broom)
+library(modelr)
+library(tidyverse)
+
+options(na.action = na.warn)
+
+theme_set(theme_bw())
+options(repr.plot.width=4, repr.plot.height=3)
+```
+
+# ISRS Problem 5.29
+```{r Problem 5.29}
+body_data <- read.table("body.dat.txt", header = FALSE) %>%
+  rename(weight=V23, height=V24)
+
+model = lm(weight ~ height, body_data)
+tidy(model)
+glance(model)
+
+# This creates the model predictions for each unique point in the data set (independents) (This isn't used after this)
+model_predictions <- body_data %>%
+  data_grid(height) %>%
+  add_predictions(model)
+
+# This creates the plot data
+plot_data <- body_data %>%
+  group_by(height) %>%
+  summarize(count=n(), mean_weight=mean(weight)) %>%
+  add_predictions(model)
+
+plot_data %>%
+  ggplot(aes(x=height, y=mean_weight)) +
+  geom_point(aes(size=count)) +
+  geom_line(aes(y=pred))
+
+```
+
+#ISRS Problems 6.1, 6.2, 6.3
+
+```{r Problems 6.1, 6.2, 6.3}
+baby_weights <- read.table("babyweights.txt", header=TRUE)
+baby_weight_model_smoke <- lm(bwt ~ smoke, baby_weights)
+tidy(baby_weight_model_smoke)
+
+baby_weight_model_parity <- lm(bwt ~ parity, baby_weights)
+tidy(baby_weight_model_parity)
+
+baby_weight_model_all <- lm(bwt ~ ., baby_weights)
+tidy(baby_weight_model_all)
+
+
+```
+6.1
+
+The equation of the regression line is baby_weight = 123.05 - 8.94*smoke
+
+If the mother is a smoker then the baby's weight will decrease by 8.94. 
+so the predicted weight of a baby born to a smoker mother is 123.05 - 8.94 = 114.11
+otherwise its 123.05.
+Yes there is a statistically significant relationship, since the p-value is basically 0.
+
+
+6.3
+
+b) For every one unit of gestation, bwt increases by .44. For every one year, bwt decreases by 0.01. 
+
+c) Why would there be a difference in the coefficients of the same variables when we include different variables in 
+the linear model ?
+
+Because the variables are related to each other? So a higher value variable could cause (maybe not the right word) 
+
