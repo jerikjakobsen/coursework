@@ -1,0 +1,232 @@
+---
+title: "citibike_predictions.sh"
+output: html_document
+date: "2023-06-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Setup
+
+
+```{r setup}
+library(ISLR2)
+
+library(tidyverse)
+library(scales)
+
+library(modelr)
+options(na.action = na.warn)
+
+library(broom)
+library(here)
+
+set.seed(1)
+```
+
+## Loading Data
+
+```{r load data}
+holiday_data <- read_csv(here("week4/holidays.csv")) %>%
+  mutate(date=date(date))
+original_data <- read.delim(here("week4/trips_per_day.tsv"), sep ="\t", header=TRUE)
+citibike_data <- original_data %>%
+  mutate(date=ymd(ymd)) %>% 
+  left_join(holiday_data) %>% 
+  replace(is.na(.), FALSE) %>% 
+  mutate(holiday=as.logical(holiday)) %>% 
+  replace(is.na(.), TRUE)
+test_sample <- sample(nrow(citibike_data), nrow(citibike_data) * 0.1)
+
+test_data <- citibike_data[test_sample,]
+train_data <- citibike_data[-test_sample,]
+```
+
+## First Model(s)
+
+```{r First Models}
+
+# Fit n models: 1 more each degree in 1:n
+n <- 20
+train_err <- c()
+validate_err <- c()
+for (i in 1:n) {
+  model <- lm(num_trips ~ poly(tmin, i), data=train_data)
+  
+  train_err[i] <- sqrt(mean((predict(model, train_data) - train_data$num_trips)^2))
+}
+
+
+plot_data <- data.frame(power=1:n, train_err)
+
+plot_data %>% 
+  ggplot(aes(x=power, y=train_err)) +
+  geom_line()
+  
+
+```
+
+## Feature Analysis
+
+### Thoughts
+
+Potential useful features
+
+- Weekend vs Weekday
+  - More people on the weekend than weekday?
+- Holiday
+  - If the day is a holiday then this might mean more people are off -> potential negative effect?
+- Temperature obviously
+  - Maybe take he average temp for that day (tmin-tmax)/2
+- Snow day or not
+- Raining or not
+
+#### Analysis of snwd, snow, and prcp
+
+```{r Feature Analysis}
+train_data %>% 
+  group_by(snow) %>% 
+  summarize(trips=sum(num_trips)) %>% 
+  ggplot(aes(x=snow, y=trips)) +
+  geom_line() +
+  ggtitle("Snow Effect")
+
+train_data %>% 
+  group_by(snwd) %>% 
+  summarize(trips=sum(num_trips)) %>% 
+  ggplot(aes(x=snwd, y=trips)) +
+  geom_line() +
+  ggtitle("snwd Effect")
+
+train_data %>% 
+  group_by(prcp) %>% 
+  summarize(trips=sum(num_trips)) %>% 
+  ggplot(aes(x=prcp, y=trips)) +
+  geom_line() +
+  ggtitle("prcp Effect")
+
+
+```
+snow and snwd appear to have a huge effect when it is 0, but not really much change greater than 0. So I think having a variable with no_prcp, no_snow, no_snwd will have a great effect.
+
+```{r testing snow, prcp, snwd}
+train_data %>% 
+  mutate(no_snow=prcp==0, no_snwd=snwd==0, no_prcp=prcp==0) %>% 
+  ggplot() +
+  geom_bar(aes(x=no_prcp))
+
+train_data %>% 
+  ggplot(aes(x=tmin, y=num_trips)) +
+  geom_point()
+```
+
+#### Analysis on day of the week and holiday
+
+How does weekday affect number of rides that day ?
+
+```{r day analysis}
+
+train_data_with_wday <- train_data %>% 
+  mutate(date=ymd(date), wday = wday(date)) %>% 
+  mutate(is_weekend=wday %in% c(1,7))
+train_data_with_wday %>% 
+  ggplot(aes(x=date, y=num_trips, color=as.factor(wday))) +
+  geom_smooth(se=F)
+train_data_with_wday %>% 
+  ggplot(aes(x=date, y=num_trips, color=is_weekend)) +
+  geom_point()
+
+train_data_with_wday %>% 
+  group_by(holiday) %>% 
+  summarize(total_trips=sum(num_trips)) %>% 
+  ggplot(aes(x=holiday, y=total_trips)) +
+  geom_col()
+
+train_data_with_wday %>% 
+  ggplot(aes(x=date, y=num_trips, color=holiday)) +
+  geom_point()
+```
+Holiday doesn't really change the number of trips in a day from the general pattern.
+However weekend has a noticeable change in the number of trips people take. 
+
+## Model Testing
+
+Here I will test numerous models with different feature combinations. Features I will try are:
+
+##### Features
+
+- Date (encoded as number)
+- is_weekend
+- t_average (tmax-tmin)/2
+- no_weather (if raining/snowing)
+
+```{r Model Testing}
+
+kfoldTest <- function(model, data, k) {
+  k_fold_data <- data %>% 
+    mutate(fold = row_number() %% k + 1)
+  validate_err = rep(0, k)
+  for (i in 1:k) {
+    held_out_data <-  k_fold_data %>% 
+      filter(fold == i)
+    training_data <- k_fold_data %>% 
+      filter(fold != i)
+    
+    model <- lm(model$terms, data=training_data)
+    validate_err[i] <- sqrt(mean((predict(model, held_out_data) - held_out_data$num_trips)^2))
+  }
+  
+  data.frame(avg_validation_err=mean(validate_err), "r^2"=1-mean(validate_err)^2/var(held_out_data$num_trips))
+}
+
+# Getting the dataframe ready
+
+train_data_all_features <- train_data_with_wday %>% 
+  mutate(no_weather=prcp==0 & snwd==0 & prcp==0, date_number=yday(date), t_average=(tmin+tmax)/2)
+
+# Train all features
+
+lm_all_features <- lm(num_trips ~ poly(date_number, 2) + no_weather + t_average + is_weekend, data = train_data_all_features)
+kfoldTest(lm_all_features, train_data_all_features, 5)
+
+# Try squaring t_average
+
+lm_all_features_2 <- lm(num_trips ~ poly(date_number, 2) + no_weather + poly(t_average, 2) + is_weekend, data = train_data_all_features)
+kfoldTest(lm_all_features_2, train_data_all_features, 5)
+
+lm_all_features_3 <- lm(num_trips ~ poly(date_number, 4) + no_weather + poly(t_average, 4) + is_weekend, data=train_data_all_features)
+kfoldTest(lm_all_features_3, train_data_all_features, 5)
+
+train_data_all_features %>% 
+  add_predictions(lm_all_features_3) %>% 
+  ggplot(aes(x=t_average)) +
+  geom_point(aes(y=num_trips)) +
+  geom_line(aes(y=pred, color=is_weekend, color=no_weather))
+
+```
+It looks like lm_all_features_3 has the best r^2 at ~85%. Here I'll modify it to use the existing data.
+
+```{r Package lm_all_features_3}
+
+final_model <- lm(num_trips ~ poly(I(yday(ymd(ymd))), 4) + I(prcp == 0 & snow == 0 & snwd == 0) + poly(I((tmax+tmin)/2) ,4) + I(wday(ymd(ymd)) %in% c(1,7)), data=original_data)
+
+kfoldTest(final_model, original_data, 5)
+
+# Run on test data
+
+1- mean((predict(final_model, test_data) - test_data$num_trips)^2)/var(test_data$num_trips)
+
+sqrt(mean((predict(final_model, test_data) - test_data$num_trips)^2))
+identity <- function(X) {x}
+original_data %>% 
+  add_predictions(final_model) %>% 
+  ggplot(aes(x=pred, y=num_trips)) +
+  geom_point() +
+  stat_function(fun=identity)
+save(final_model, file = "model.RData")
+```
+
+With my final model I acheived a rmse of 4459 and ~85% R^2 on the test data.
+
