@@ -209,18 +209,19 @@ train_data_all_features %>%
 It looks like lm_all_features_3 has the best r^2 at ~85%. Here I'll modify it to use the existing data.
 
 ```{r Package lm_all_features_3}
+original_test_data <- original_data[test_sample,]
+original_train_data <- original_data[-test_sample,]
+final_model <- lm(num_trips ~ poly(I(yday(ymd(ymd))), 4, raw=T) + I(prcp == 0 & snow == 0 & snwd == 0) + poly(I((tmax+tmin)/2) ,4, raw=T) + I(wday(ymd(ymd)) %in% c(1,7)), data=original_train_data)
 
-final_model <- lm(num_trips ~ poly(I(yday(ymd(ymd))), 4) + I(prcp == 0 & snow == 0 & snwd == 0) + poly(I((tmax+tmin)/2) ,4) + I(wday(ymd(ymd)) %in% c(1,7)), data=original_data)
-
-kfoldTest(final_model, original_data, 5)
+kfoldTest(final_model, original_train_data, 5)
 
 # Run on test data
 
-1- mean((predict(final_model, test_data) - test_data$num_trips)^2)/var(test_data$num_trips)
+1- mean((predict(final_model, original_test_data) - original_test_data$num_trips)^2)/var(original_test_data$num_trips)
 
-sqrt(mean((predict(final_model, test_data) - test_data$num_trips)^2))
+sqrt(mean((predict(final_model, original_test_data) - original_test_data$num_trips)^2))
 identity <- function(X) {x}
-original_data %>% 
+original_test_data %>% 
   add_predictions(final_model) %>% 
   ggplot(aes(x=pred, y=num_trips)) +
   geom_point() +
@@ -228,5 +229,5 @@ original_data %>%
 save(final_model, file = "model.RData")
 ```
 
-With my final model I acheived a rmse of 4459 and ~85% R^2 on the test data.
+With my final model I acheived a rmse of 4539 and ~77% R^2 on the test data.
 

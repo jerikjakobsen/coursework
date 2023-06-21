@@ -1,0 +1,36 @@
+---
+title: "test_citibike_predictions"
+output: html_document
+date: "2023-06-21"
+---
+
+## Setup
+
+``` {r Setup}
+library(ISLR2)
+
+library(tidyverse)
+library(scales)
+
+library(modelr)
+options(na.action = na.warn)
+
+library(broom)
+library(here)
+
+set.seed(1)
+```
+
+## Load Data and Model
+
+```{r Load Data and Model}
+
+load(here("week4/model.RData"))
+load(here("week4/trips_2015.RData"))
+
+1 - mean((predict(final_model, trips) - trips$num_trips)^2)/var(trips$num_trips)
+
+sqrt(mean((predict(final_model, trips) - trips$num_trips)^2))
+
+```
+
